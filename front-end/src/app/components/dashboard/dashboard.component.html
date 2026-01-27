@@ -1,0 +1,101 @@
+<div class="dashboard-container">
+  <header class="dashboard-header">
+    <h1>Risk Dashboard</h1>
+    @if (dashboardData(); as data) {
+      <div class="health-status">
+        <span class="status-badge" [class.healthy]="data.health.status === 'HEALTHY'">
+          {{ data.health.status }}
+        </span>
+        <span class="latency-info">
+          Avg Latency: {{ data.health.avgLatencyMs | number:'1.0-1' }}ms
+        </span>
+      </div>
+    }
+  </header>
+
+  @if (loading()) {
+    <div class="loading-container">
+      <p>Loading dashboard data...</p>
+    </div>
+  } @else if (error()) {
+    <div class="error-container">
+      <p>{{ error() }}</p>
+      <button (click)="retry()">Retry</button>
+    </div>
+  } @else if (dashboardData(); as data) {
+    <div class="dashboard-grid">
+      <!-- Risk Section -->
+      <section class="dashboard-section risk-section">
+        <h2>Risk Metrics</h2>
+        <div class="summary-cards">
+          <div class="summary-card">
+            <span class="card-label">Total Net Exposure</span>
+            <span class="card-value">${{ data.riskSummary.totalNetExposure | number:'1.0-0' }}</span>
+          </div>
+          <div class="summary-card">
+            <span class="card-label">Max Margin Utilization</span>
+            <span class="card-value">{{ data.riskSummary.maxMarginUtilization | percent:'1.0-1' }}</span>
+          </div>
+        </div>
+        <app-risk-visualization [riskAccounts]="data.riskAccounts" [riskMetrics]="data.riskMetrics" />
+      </section>
+
+      <!-- Trading Section -->
+      <section class="dashboard-section trading-section">
+        <h2>Trading Activity</h2>
+        <div class="summary-cards">
+          <div class="summary-card">
+            <span class="card-label">Open Orders</span>
+            <span class="card-value">{{ data.tradingSummary.openOrders }}</span>
+          </div>
+          <div class="summary-card">
+            <span class="card-label">Filled Today</span>
+            <span class="card-value">{{ data.tradingSummary.filledToday }}</span>
+          </div>
+          <div class="summary-card">
+            <span class="card-label">Realized PnL</span>
+            <span class="card-value" [class.positive]="data.tradingSummary.realizedPnl > 0" [class.negative]="data.tradingSummary.realizedPnl < 0">
+              ${{ data.tradingSummary.realizedPnl | number:'1.0-0' }}
+            </span>
+          </div>
+        </div>
+        <app-trading-visualization [orders]="data.openOrders" [fills]="data.recentFills" />
+      </section>
+
+      <!-- Ledger Section -->
+      <section class="dashboard-section ledger-section">
+        <h2>Ledger & Balances</h2>
+        <div class="summary-cards">
+          <div class="summary-card">
+            <span class="card-label">Total Accounts</span>
+            <span class="card-value">{{ data.accountBalances.length }}</span>
+          </div>
+          <div class="summary-card">
+            <span class="card-label">Recent Transactions</span>
+            <span class="card-value">{{ data.recentTransactions.length }}</span>
+          </div>
+        </div>
+        <app-ledger-visualization [balances]="data.accountBalances" [transactions]="data.recentTransactions" />
+      </section>
+
+      <!-- Latency Metrics -->
+      <section class="dashboard-section latency-section">
+        <h2>Service Latency</h2>
+        <div class="latency-metrics">
+          <div class="latency-item">
+            <span class="latency-label">Risk Service</span>
+            <span class="latency-value">{{ data.latencyMetrics.riskServiceMs | number:'1.0-1' }}ms</span>
+          </div>
+          <div class="latency-item">
+            <span class="latency-label">Trading Service</span>
+            <span class="latency-value">{{ data.latencyMetrics.tradingServiceMs | number:'1.0-1' }}ms</span>
+          </div>
+          <div class="latency-item">
+            <span class="latency-label">Ledger Service</span>
+            <span class="latency-value">{{ data.latencyMetrics.ledgerServiceMs | number:'1.0-1' }}ms</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  }
+</div>
