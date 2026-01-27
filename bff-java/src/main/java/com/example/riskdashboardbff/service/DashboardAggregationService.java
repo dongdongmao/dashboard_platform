@@ -70,7 +70,21 @@ public class DashboardAggregationService {
         Mono<List<Transaction>> recentTransactions = ledgerMetricsClient.fetchRecentTransactions();
 
         // 4) Zip all Mono sources together to demonstrate concurrent aggregation.
+        // Mono.zip() with Function accepts variable arguments (up to 16), perfect for 11 sources
         return Mono.zip(
+                tuple -> new DashboardViewModel(
+                        (List<RiskyAccount>) tuple[0],           // accounts
+                        (SystemHealth) tuple[1],                 // health
+                        (RiskSummary) tuple[2],                  // riskSummary
+                        (TradingSummary) tuple[3],               // tradingSummary
+                        (LatencyMetrics) tuple[4],               // latencyMetrics
+                        (List<RiskAccount>) tuple[5],            // riskAccounts
+                        (List<RiskMetric>) tuple[6],             // riskMetrics
+                        (List<TradingOrder>) tuple[7],           // openOrders
+                        (List<TradingFill>) tuple[8],            // recentFills
+                        (List<AccountBalance>) tuple[9],         // accountBalances
+                        (List<Transaction>) tuple[10]             // recentTransactions
+                ),
                 accounts,
                 health,
                 riskSummary,
@@ -82,19 +96,7 @@ public class DashboardAggregationService {
                 recentFills,
                 accountBalances,
                 recentTransactions
-        ).map(tuple -> new DashboardViewModel(
-                tuple.getT1(),   // accounts
-                tuple.getT2(),   // health
-                tuple.getT3(),   // riskSummary
-                tuple.getT4(),   // tradingSummary
-                tuple.getT5(),   // latencyMetrics
-                tuple.getT6(),   // riskAccounts
-                tuple.getT7(),   // riskMetrics
-                tuple.getT8(),   // openOrders
-                tuple.getT9(),   // recentFills
-                tuple.getT10(),  // accountBalances
-                tuple.getT11()   // recentTransactions
-        ));
+        );
     }
 
     private Flux<RiskyAccount> loadPositionsInMemory() {

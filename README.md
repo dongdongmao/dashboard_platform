@@ -72,7 +72,7 @@ The current repository contains the **SSR dashboard shell and infrastructure for
   - System monitoring endpoints
 - **Data Access**:
   - Redis (for cached metrics and “Top N” rankings)
-  - Kafka (for streaming mock risk events into Redis)
+  - Mock Services read from Redis (pre-loaded data for demonstration)
 
 > In this POC repository, the downstream dependencies are **mocked**, and the focus is on the **frontend shell + containerization** and the **architecture/README explanation** rather than standing up full infra.
 
@@ -81,8 +81,10 @@ The current repository contains the **SSR dashboard shell and infrastructure for
 - **Runtime**: Node.js container serving Angular SSR output
 - **Containerization**: `Dockerfile` + `docker-compose.yml`
 - **Supporting Services** (Dockerized for this POC):
-  - Redis (caching and Top N rankings)
-  - Kafka + Zookeeper (mock streaming backbone feeding risk events into Redis)
+  - Redis (caching and Top N rankings, shared data store for Mock Services)
+  - Mock Risk Service (port 9001)
+  - Mock Trading Service (port 9002)
+  - Mock Ledger Service (port 9003)
 
 ---
 
