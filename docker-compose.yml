@@ -25,6 +25,33 @@ services:
       - "6379:6379"
     command: ["redis-server", "--appendonly", "no"]
 
+  risk-service:
+    build:
+      context: ./mock-risk-service
+      dockerfile: Dockerfile
+    ports:
+      - "9001:9001"
+    depends_on:
+      - redis
+
+  trading-service:
+    build:
+      context: ./mock-trading-service
+      dockerfile: Dockerfile
+    ports:
+      - "9002:9002"
+    depends_on:
+      - redis
+
+  ledger-service:
+    build:
+      context: ./mock-ledger-service
+      dockerfile: Dockerfile
+    ports:
+      - "9003:9003"
+    depends_on:
+      - redis
+
   zookeeper:
     image: bitnami/zookeeper:3.9
     environment:

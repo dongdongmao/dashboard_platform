@@ -2,7 +2,16 @@ package com.example.riskdashboardbff.service;
 
 import com.example.riskdashboardbff.model.DashboardViewModel;
 import com.example.riskdashboardbff.model.DashboardViewModel.RiskyAccount;
+import com.example.riskdashboardbff.model.DashboardViewModel.RiskSummary;
 import com.example.riskdashboardbff.model.DashboardViewModel.SystemHealth;
+import com.example.riskdashboardbff.model.DashboardViewModel.TradingSummary;
+import com.example.riskdashboardbff.model.DashboardViewModel.LatencyMetrics;
+import com.example.riskdashboardbff.model.DashboardViewModel.RiskAccount;
+import com.example.riskdashboardbff.model.DashboardViewModel.RiskMetric;
+import com.example.riskdashboardbff.model.DashboardViewModel.TradingOrder;
+import com.example.riskdashboardbff.model.DashboardViewModel.TradingFill;
+import com.example.riskdashboardbff.model.DashboardViewModel.AccountBalance;
+import com.example.riskdashboardbff.model.DashboardViewModel.Transaction;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -20,21 +29,72 @@ public class DashboardAggregationService {
     private static final String TOP_RISK_KEY = "top:risky:accounts";
 
     private final ReactiveStringRedisTemplate redisTemplate;
+    private final RiskMetricsClient riskMetricsClient;
+    private final TradingMetricsClient tradingMetricsClient;
+    private final LatencyMetricsClient latencyMetricsClient;
+    private final LedgerMetricsClient ledgerMetricsClient;
 
-    public DashboardAggregationService(ReactiveStringRedisTemplate redisTemplate) {
+    public DashboardAggregationService(
+            ReactiveStringRedisTemplate redisTemplate,
+            RiskMetricsClient riskMetricsClient,
+            TradingMetricsClient tradingMetricsClient,
+            LatencyMetricsClient latencyMetricsClient,
+            LedgerMetricsClient ledgerMetricsClient
+    ) {
         this.redisTemplate = redisTemplate;
+        this.riskMetricsClient = riskMetricsClient;
+        this.tradingMetricsClient = tradingMetricsClient;
+        this.latencyMetricsClient = latencyMetricsClient;
+        this.ledgerMetricsClient = ledgerMetricsClient;
     }
 
     public Mono<DashboardViewModel> aggregate() {
-        // Compose a Flux of accounts: try Redis first, then seed Redis and reload if empty
+        // 1) Accounts: Redis-backed Top N, seeded from in-memory mock data if empty.
         Flux<RiskyAccount> accountsFlux = loadTopAccountsFromRedis()
                 .switchIfEmpty(seedAndLoadTopAccounts());
-
         Mono<List<RiskyAccount>> accounts = accountsFlux.collectList();
-        Mono<SystemHealth> health = loadSystemHealth();
 
-        return Mono.zip(accounts, health)
-                .map(tuple -> new DashboardViewModel(tuple.getT1(), tuple.getT2()));
+        // 2) Multiple concurrent calls to downstream services via non-blocking IO.
+        // This demonstrates true fan-out/fan-in behavior with real HTTP I/O.
+        Mono<SystemHealth> health = loadSystemHealth();
+        Mono<RiskSummary> riskSummary = riskMetricsClient.fetchRiskSummary();
+        Mono<TradingSummary> tradingSummary = tradingMetricsClient.fetchTradingSummary();
+        Mono<LatencyMetrics> latencyMetrics = latencyMetricsClient.measureLatencies();
+
+        // 3) Additional data fetches from each service to show rich data aggregation.
+        Mono<List<RiskAccount>> riskAccounts = riskMetricsClient.fetchRiskAccounts();
+        Mono<List<RiskMetric>> riskMetrics = riskMetricsClient.fetchRiskMetrics();
+        Mono<List<TradingOrder>> openOrders = tradingMetricsClient.fetchOpenOrders();
+        Mono<List<TradingFill>> recentFills = tradingMetricsClient.fetchRecentFills();
+        Mono<List<AccountBalance>> accountBalances = ledgerMetricsClient.fetchAccountBalances();
+        Mono<List<Transaction>> recentTransactions = ledgerMetricsClient.fetchRecentTransactions();
+
+        // 4) Zip all Mono sources together to demonstrate concurrent aggregation.
+        return Mono.zip(
+                accounts,
+                health,
+                riskSummary,
+                tradingSummary,
+                latencyMetrics,
+                riskAccounts,
+                riskMetrics,
+                openOrders,
+                recentFills,
+                accountBalances,
+                recentTransactions
+        ).map(tuple -> new DashboardViewModel(
+                tuple.getT1(),   // accounts
+                tuple.getT2(),   // health
+                tuple.getT3(),   // riskSummary
+                tuple.getT4(),   // tradingSummary
+                tuple.getT5(),   // latencyMetrics
+                tuple.getT6(),   // riskAccounts
+                tuple.getT7(),   // riskMetrics
+                tuple.getT8(),   // openOrders
+                tuple.getT9(),   // recentFills
+                tuple.getT10(),  // accountBalances
+                tuple.getT11()   // recentTransactions
+        ));
     }
 
     private Flux<RiskyAccount> loadPositionsInMemory() {

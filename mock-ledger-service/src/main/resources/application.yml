@@ -1,0 +1,11 @@
+server:
+  port: 9003
+
+spring:
+  application:
+    name: mock-ledger-service
+  data:
+    redis:
+      host: redis
+      port: 6379
+

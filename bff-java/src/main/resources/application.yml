@@ -8,16 +8,13 @@ spring:
     redis:
       host: redis
       port: 6379
-  kafka:
-    bootstrap-servers: kafka:9092
-    consumer:
-      group-id: risk-dashboard
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+downstream:
+  risk:
+    base-url: http://risk-service:9001
+  trading:
+    base-url: http://trading-service:9002
+  ledger:
+    base-url: http://ledger-service:9003
 
 management:
   endpoints:
