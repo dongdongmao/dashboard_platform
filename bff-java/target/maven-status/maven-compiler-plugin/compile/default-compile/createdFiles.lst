@@ -1,6 +1,0 @@
-com\example\riskdashboardbff\api\DashboardController.class
-com\example\riskdashboardbff\model\DashboardViewModel$SystemHealth.class
-com\example\riskdashboardbff\service\DashboardAggregationService.class
-com\example\riskdashboardbff\model\DashboardViewModel$RiskyAccount.class
-com\example\riskdashboardbff\RiskDashboardBffApplication.class
-com\example\riskdashboardbff\model\DashboardViewModel.class
