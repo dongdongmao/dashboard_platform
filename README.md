@@ -19,7 +19,7 @@ All domain data and implementation here are **fully desensitized and rewritten w
   - Under latency spikes or partial outages, users saw blank pages or inconsistent tiles because some APIs failed while others succeeded.
 
 This POC focuses on isolating and re-implementing **one core capability** from that system:  
-> “Aggregate and serve a consistent, pre-optimized risk view model for the dashboard, with fast first paint and clear degradation behavior.”
+> "Aggregate and serve a consistent, pre-optimized risk view model for the dashboard, with fast first paint and clear degradation behavior."
 
 ---
 
@@ -30,58 +30,61 @@ This POC focuses on isolating and re-implementing **one core capability** from t
 **Risk Aggregation BFF + SSR Dashboard Shell**
 
 - The backend is modeled as a **Java BFF (Backend-for-Frontend)** responsible for:
-  - Fan-out to multiple downstream sources (simulated here with in-memory/mock data).
+  - Fan-out to multiple downstream sources (simulated here with mock services).
   - Aggregation into a single **dashboard view model** (per account / per book exposure, alerts, health metrics).
-  - Simple caching & degradation behavior.
+  - Redis-backed caching for "Top N" rankings.
 - The frontend is an **Angular SSR dashboard shell** that consumes this view model and renders the first screen on the server.
 
 ### Technical Challenge Highlights
 
 - **Concurrent fan-out / fan-in aggregation (Java)**
-  - In the original system this was implemented with non-blocking IO; here we keep the same design principles and model the BFF as an asynchronous aggregator (the actual Java implementation can be extended on top of this POC).
+  - Implemented with non-blocking IO using Spring WebFlux and Project Reactor's `Mono.zip()` for parallel service calls.
 - **SSR & Hydration**
-  - The first screen is rendered on the server using Angular Universal-style SSR, which drastically improves *time-to-content* even if backend calls are slightly delayed.
-- **“Top N” calculations**
-  - Risk tiles show “Top N riskiest positions/accounts” derived from mock data; in the original system this was backed by Redis Sorted Sets to support \(O(\log N)\) updates.
+  - The first screen is rendered on the server using Angular SSR, which drastically improves *time-to-content* even if backend calls are slightly delayed.
+- **"Top N" calculations**
+  - Risk tiles show "Top N riskiest positions/accounts" backed by Redis Sorted Sets to support O(log N) updates.
 
-The current repository contains the **SSR dashboard shell and infrastructure for containerization**; the Java BFF and data layer are intentionally kept light-weight / mock-driven to stay within POC scope, but the architecture is laid out to reflect how it worked in the real system.
+The current repository contains a complete implementation including:
+- **Angular SSR dashboard** with D3.js visualizations
+- **Java BFF** with WebFlux-based concurrent aggregation
+- **Three mock microservices** (Risk, Trading, Ledger) with Redis integration
+- **Docker Compose** for one-click deployment
 
 ---
 
-## 3. Technology Stack (Aligned with Challenge)
+## 3. Technology Stack
 
 ### Language Choice
 
 - **Primary implementation language for backend:** **Java**  
-  (Matches the requirement of using *Python / C# / Java*; the BFF design and contracts here are based on a Java WebFlux-style aggregator module from my previous project. The concrete BFF implementation can be expanded under a `bff-java/` folder using Spring Boot 3.x + WebFlux.)
+  (The BFF is implemented under `bff-java/` using Spring Boot 3.x + WebFlux for non-blocking concurrent aggregation.)
 
 ### Frontend
 
 - **Framework**: Angular 21+ with SSR (Universal-style `@angular/ssr`)
 - **State Management**: Signals & RxJS
-- **Visualization**: (Can be extended with ECharts / ngx-charts for richer charts)
-- **Communication**: REST + (future) WebSocket for live updates （Simulate）
+- **Visualization**: D3.js for bar charts and data visualization
+- **Communication**: REST API
 
-### Backend (BFF – Conceptual Design)
+### Backend (BFF)
 
 - **Runtime**: Java 17/21 & Spring Boot 3.x (WebFlux)
 - **Concurrency Model**: Non-blocking IO (Project Reactor), used for concurrent calls to:
-  - Risk engine
-  - Trading feeds
-  - Ledger / balances
-  - System monitoring endpoints
+  - Risk Service
+  - Trading Service
+  - Ledger Service
 - **Data Access**:
-  - Redis (for cached metrics and “Top N” rankings)
-  - Mock Services read from Redis (pre-loaded data for demonstration)
-
-> In this POC repository, the downstream dependencies are **mocked**, and the focus is on the **frontend shell + containerization** and the **architecture/README explanation** rather than standing up full infra.
+  - Redis (for cached metrics and "Top N" rankings)
+  - Mock Services with Redis-backed data storage
 
 ### Infrastructure
 
 - **Runtime**: Node.js container serving Angular SSR output
 - **Containerization**: `Dockerfile` + `docker-compose.yml`
-- **Supporting Services** (Dockerized for this POC):
-  - Redis (caching and Top N rankings, shared data store for Mock Services)
+- **Services** (all Dockerized):
+  - Dashboard UI (port 4000)
+  - BFF Java (port 8080)
+  - Redis (port 6379)
   - Mock Risk Service (port 9001)
   - Mock Trading Service (port 9002)
   - Mock Ledger Service (port 9003)
@@ -107,40 +110,22 @@ The current repository contains the **SSR dashboard shell and infrastructure for
 - SSR minimizes **time-to-first-meaningful-content**, even if some backend calls are not yet resolved.
 - With Hydration:
   - The initial HTML is server-rendered.
-  - The browser then “takes over” without a visible flicker.
+  - The browser then "takes over" without a visible flicker.
 
-### Why Cache & “Top N” in a Separate Layer?
+### Why Cache & "Top N" in a Separate Layer?
 
-- Ranking “Top N riskiest positions” and other aggregates are:
+- Ranking "Top N riskiest positions" and other aggregates are:
   - Expensive if recomputed from the primary database on each request.
   - Easy to maintain incrementally in a cache (e.g., Redis Sorted Sets).
 - Separation allows:
   - Fast reads for the BFF.
   - Tuning of eviction / refresh policies independently of the UI.
 
-### Trade-offs in This POC
-
-- **Mocked Data Instead of Real Feeds**
-  - All data is generated locally / in-memory with fake accounts and positions.
-  - This keeps the POC safe from any data-leak concerns while still demonstrating data-flow and aggregation patterns.
-
 ---
 
 ## 5. How to Run & Verify (Validation Guide)
 
-This section aligns with the “validation guide” requirement in the challenge.
-
-**What to Expect**
-
-- The first page is rendered on the server (fast first paint).
-- Mock tiles display:
-  - Sample exposure metrics.
-  - “Top N” style lists based on mock data.
-  - Basic health indicators.
-
-> In a full version, these tiles would be backed by the Java BFF and real infra; in this POC, the emphasis is on the **architecture and SSR behavior**.
-
-### 5.2 Docker / Docker Compose (One-Click Setup)
+### 5.1 Docker / Docker Compose (One-Click Setup)
 
 **Prerequisites**
 
@@ -158,25 +143,51 @@ Then open `http://localhost:4000` in your browser.
 
 **What This Does**
 
-- Builds a Node-based image using the `Dockerfile`.
-- Runs the Angular SSR server inside a container.
-- Exposes port `4000` on your host.
+- Builds all services (Frontend, BFF, Mock Services)
+- Starts Redis for caching
+- Exposes ports: 4000 (UI), 8080 (BFF), 9001-9003 (Mock Services)
+
+### 5.2 Verifying SSR
+
+| Method | Steps |
+|--------|-------|
+| **View Page Source** | Right-click → "View Page Source". You should see pre-rendered HTML with actual data. |
+| **Disable JavaScript** | Chrome DevTools → Settings → Disable JavaScript. Refresh. The page should still display data and charts. |
+| **curl Command** | `curl http://localhost:4000` should return HTML with embedded dashboard data. |
+
+### 5.3 Verifying BFF Aggregation
+
+**Direct API Test**
+```bash
+curl http://localhost:8080/api/dashboard | jq .
+```
+
+**Concurrent Aggregation Verification**
+```bash
+time curl -s http://localhost:8080/api/dashboard > /dev/null
+```
+- With concurrent calls (Mono.zip), total time ≈ max(service latencies) ≈ 100-150ms
+- If sequential, would be sum of latencies ≈ 300ms+
+
+**Redis Top N Check**
+```bash
+docker exec -it dashboard_platform-redis-1 redis-cli
+ZREVRANGE top:risky:accounts 0 4 WITHSCORES
+```
 
 ---
 
 ## 6. AI Collaboration Notes
 
-This POC was built with assistance from **AI tools (primarily Cursor)**, in line with the challenge’s encouragement to leverage AI.
+This POC was built with assistance from **AI tools (primarily Cursor)**, in line with the challenge's encouragement to leverage AI.
 
 - **Where AI Helped**
-  - Drafting and iterating on this `README` structure to align precisely with the challenge requirements (business context, technical challenge points, architectural trade-offs, validation guide, etc.).
-  - Generating boilerplate for the Angular SSR setup and Docker / Docker Compose files.
-  - Suggesting phrasing and organization for documenting architectural trade-offs.
+  - Drafting and iterating on this `README` structure.
+  - Generating boilerplate for Angular SSR setup and Docker files.
+  - Implementing D3.js visualizations with SSR support.
 - **What I Did Manually**
   - Chose the business scenario and module scope based on my real project experience.
-  - Designed the overall architecture (BFF + SSR + caching) and decided which parts to keep / simplify for the POC.
-  - Reviewed and adjusted AI-generated content to:
-    - Remove any vendor-specific or sensitive details.
-    - Keep the POC focused, small, and aligned with how the real system behaved.
+  - Designed the overall architecture (BFF + SSR + caching).
+  - Reviewed and adjusted AI-generated content.
 
 All code and documentation in this repository are **newly written for this challenge** and use **mock / synthetic data** only.
