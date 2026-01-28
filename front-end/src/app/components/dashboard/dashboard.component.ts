@@ -4,6 +4,7 @@ import { DashboardService, DashboardViewModel } from '../../services/dashboard.s
 import { RiskVisualizationComponent } from '../risk-visualization/risk-visualization.component';
 import { TradingVisualizationComponent } from '../trading-visualization/trading-visualization.component';
 import { LedgerVisualizationComponent } from '../ledger-visualization/ledger-visualization.component';
+import { ErrorBoundaryComponent } from '../shared/error-boundary/error-boundary.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -12,7 +13,8 @@ import { LedgerVisualizationComponent } from '../ledger-visualization/ledger-vis
     CommonModule,
     RiskVisualizationComponent,
     TradingVisualizationComponent,
-    LedgerVisualizationComponent
+    LedgerVisualizationComponent,
+    ErrorBoundaryComponent
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss'

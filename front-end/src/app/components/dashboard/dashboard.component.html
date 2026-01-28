@@ -18,10 +18,12 @@
       <p>Loading dashboard data...</p>
     </div>
   } @else if (error()) {
-    <div class="error-container">
-      <p>{{ error() }}</p>
-      <button (click)="retry()">Retry</button>
-    </div>
+    <app-error-boundary
+      title="Unable to Load Dashboard"
+      [message]="error() ?? 'An unexpected error occurred'"
+      [showRetry]="true"
+      (retry)="retry()">
+    </app-error-boundary>
   } @else if (dashboardData(); as data) {
     <div class="dashboard-grid">
       <!-- Risk Section -->

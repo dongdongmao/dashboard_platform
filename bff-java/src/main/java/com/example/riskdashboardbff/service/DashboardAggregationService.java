@@ -29,23 +29,23 @@ public class DashboardAggregationService {
     private static final String TOP_RISK_KEY = "top:risky:accounts";
 
     private final ReactiveStringRedisTemplate redisTemplate;
-    private final RiskMetricsClient riskMetricsClient;
-    private final TradingMetricsClient tradingMetricsClient;
+    private final RiskServiceClient riskServiceClient;
+    private final TradingServiceClient tradingServiceClient;
     private final LatencyMetricsClient latencyMetricsClient;
-    private final LedgerMetricsClient ledgerMetricsClient;
+    private final LedgerServiceClient ledgerServiceClient;
 
     public DashboardAggregationService(
             ReactiveStringRedisTemplate redisTemplate,
-            RiskMetricsClient riskMetricsClient,
-            TradingMetricsClient tradingMetricsClient,
+            RiskServiceClient riskServiceClient,
+            TradingServiceClient tradingServiceClient,
             LatencyMetricsClient latencyMetricsClient,
-            LedgerMetricsClient ledgerMetricsClient
+            LedgerServiceClient ledgerServiceClient
     ) {
         this.redisTemplate = redisTemplate;
-        this.riskMetricsClient = riskMetricsClient;
-        this.tradingMetricsClient = tradingMetricsClient;
+        this.riskServiceClient = riskServiceClient;
+        this.tradingServiceClient = tradingServiceClient;
         this.latencyMetricsClient = latencyMetricsClient;
-        this.ledgerMetricsClient = ledgerMetricsClient;
+        this.ledgerServiceClient = ledgerServiceClient;
     }
 
     public Mono<DashboardViewModel> aggregate() {
@@ -57,17 +57,17 @@ public class DashboardAggregationService {
         // 2) Multiple concurrent calls to downstream services via non-blocking IO.
         // This demonstrates true fan-out/fan-in behavior with real HTTP I/O.
         Mono<SystemHealth> health = loadSystemHealth();
-        Mono<RiskSummary> riskSummary = riskMetricsClient.fetchRiskSummary();
-        Mono<TradingSummary> tradingSummary = tradingMetricsClient.fetchTradingSummary();
+        Mono<RiskSummary> riskSummary = riskServiceClient.fetchRiskSummary();
+        Mono<TradingSummary> tradingSummary = tradingServiceClient.fetchTradingSummary();
         Mono<LatencyMetrics> latencyMetrics = latencyMetricsClient.measureLatencies();
 
         // 3) Additional data fetches from each service to show rich data aggregation.
-        Mono<List<RiskAccount>> riskAccounts = riskMetricsClient.fetchRiskAccounts();
-        Mono<List<RiskMetric>> riskMetrics = riskMetricsClient.fetchRiskMetrics();
-        Mono<List<TradingOrder>> openOrders = tradingMetricsClient.fetchOpenOrders();
-        Mono<List<TradingFill>> recentFills = tradingMetricsClient.fetchRecentFills();
-        Mono<List<AccountBalance>> accountBalances = ledgerMetricsClient.fetchAccountBalances();
-        Mono<List<Transaction>> recentTransactions = ledgerMetricsClient.fetchRecentTransactions();
+        Mono<List<RiskAccount>> riskAccounts = riskServiceClient.fetchRiskAccounts();
+        Mono<List<RiskMetric>> riskMetrics = riskServiceClient.fetchRiskMetrics();
+        Mono<List<TradingOrder>> openOrders = tradingServiceClient.fetchOpenOrders();
+        Mono<List<TradingFill>> recentFills = tradingServiceClient.fetchRecentFills();
+        Mono<List<AccountBalance>> accountBalances = ledgerServiceClient.fetchAccountBalances();
+        Mono<List<Transaction>> recentTransactions = ledgerServiceClient.fetchRecentTransactions();
 
         // 4) Zip all Mono sources together to demonstrate concurrent aggregation.
         // Mono.zip() with Function accepts variable arguments (up to 16), perfect for 11 sources

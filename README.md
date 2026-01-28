@@ -121,6 +121,12 @@ The current repository contains a complete implementation including:
   - Fast reads for the BFF.
   - Tuning of eviction / refresh policies independently of the UI.
 
+### Trade-offs in This POC
+
+- **Mocked Data Instead of Real Feeds**
+  - All data is generated locally / in-memory with fake accounts and positions.
+  - This keeps the POC safe from any data-leak concerns while still demonstrating data-flow and aggregation patterns.
+
 ---
 
 ## 5. How to Run & Verify (Validation Guide)
