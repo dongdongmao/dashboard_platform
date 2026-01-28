@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, PLATFORM_ID, inject } from '@angular/core';
-import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { CommonModule, isPlatformBrowser, isPlatformServer } from '@angular/common';
 import { DashboardService, DashboardViewModel } from '../../services/dashboard.service';
 import { RiskVisualizationComponent } from '../risk-visualization/risk-visualization.component';
 import { TradingVisualizationComponent } from '../trading-visualization/trading-visualization.component';
@@ -24,6 +24,7 @@ export class DashboardComponent implements OnInit {
 
   private readonly platformId = inject(PLATFORM_ID);
   private readonly isBrowser = isPlatformBrowser(this.platformId);
+  private readonly isServer = isPlatformServer(this.platformId);
 
   constructor(private dashboardService: DashboardService) {}
 
@@ -31,6 +32,7 @@ export class DashboardComponent implements OnInit {
     // In SSR, data should already be preloaded via APP_INITIALIZER and stored in TransferState
     // The service will return it synchronously from TransferState
     // If not available, it will fetch from API (client-side fallback)
+    console.log('[Dashboard] ngOnInit - isServer:', this.isServer, 'isBrowser:', this.isBrowser);
     this.loadDashboardData();
   }
 

@@ -1,5 +1,5 @@
-import { Component, Input, AfterViewInit, PLATFORM_ID, inject, OnChanges, SimpleChanges, Renderer2, ChangeDetectorRef } from '@angular/core';
-import { isPlatformBrowser, CommonModule } from '@angular/common';
+import { Component, Input, PLATFORM_ID, inject, OnInit, OnChanges, SimpleChanges, ChangeDetectorRef } from '@angular/core';
+import { isPlatformBrowser, isPlatformServer, CommonModule } from '@angular/common';
 import * as d3 from 'd3';
 import { AccountBalance, Transaction } from '../../services/dashboard.service';
 import { BarChartComponent, BarChartData, BarChartConfig } from '../shared/bar-chart/bar-chart.component';
@@ -50,7 +50,7 @@ import { BarChartComponent, BarChartData, BarChartConfig } from '../shared/bar-c
     }
   `]
 })
-export class LedgerVisualizationComponent implements AfterViewInit, OnChanges {
+export class LedgerVisualizationComponent implements OnInit, OnChanges {
   @Input() balances: AccountBalance[] = [];
   @Input() transactions: Transaction[] = [];
 
@@ -59,25 +59,29 @@ export class LedgerVisualizationComponent implements AfterViewInit, OnChanges {
   txData: Array<{ type: string; count: number }> = [];
 
   private readonly platformId = inject(PLATFORM_ID);
-  private readonly renderer = inject(Renderer2);
   private readonly cdr = inject(ChangeDetectorRef);
   private isBrowser = isPlatformBrowser(this.platformId);
+  private isServer = isPlatformServer(this.platformId);
 
-  ngAfterViewInit(): void {
-    if (this.isBrowser) {
-      this.updateCharts();
-    }
+  ngOnInit(): void {
+    console.log('[LedgerVisualization] ngOnInit:', {
+      isServer: this.isServer,
+      balancesLength: this.balances?.length
+    });
+    // Process data immediately for both SSR and browser
+    this.updateCharts();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (this.isBrowser) {
-      if (changes['balances'] || changes['transactions']) {
-        setTimeout(() => {
-          this.updateCharts();
-          // Force change detection to ensure BarChartComponent receives the update
-          this.cdr.detectChanges();
-        }, 0);
-      }
+    console.log('[LedgerVisualization] ngOnChanges:', {
+      isServer: this.isServer,
+      balancesChanged: !!changes['balances'],
+      balancesLength: this.balances?.length
+    });
+    // Process data for both SSR and browser - same logic
+    if (changes['balances'] || changes['transactions']) {
+      this.updateCharts();
+      this.cdr.detectChanges();
     }
   }
 
@@ -87,24 +91,22 @@ export class LedgerVisualizationComponent implements AfterViewInit, OnChanges {
   }
 
   private updateBarChart(): void {
-    console.log('LedgerVisualizationComponent updateBarChart:', {
-      balancesLength: this.balances?.length,
-      balances: this.balances
+    console.log('[LedgerVisualization] updateBarChart:', {
+      balancesLength: this.balances?.length
     });
     
     if (!this.balances || !this.balances.length) {
       this.barChartData = [];
       this.barChartConfig = {};
-      console.log('LedgerVisualizationComponent: No balances, clearing chart data');
       return;
     }
 
-    const balancesByCurrency = d3.group(this.balances, d => d.currency);
+    const balancesByCurrency = d3.group(this.balances, (d: AccountBalance) => d.currency);
     const currencyData = Array.from(balancesByCurrency, ([currency, balances]) => ({
       currency,
-      totalCash: d3.sum(balances, d => d.cashBalance) || 0,
-      totalMarginUsed: d3.sum(balances, d => d.marginUsed) || 0,
-      totalAvailable: d3.sum(balances, d => d.availableMargin) || 0,
+      totalCash: d3.sum(balances, (d: AccountBalance) => d.cashBalance) || 0,
+      totalMarginUsed: d3.sum(balances, (d: AccountBalance) => d.marginUsed) || 0,
+      totalAvailable: d3.sum(balances, (d: AccountBalance) => d.availableMargin) || 0,
       accountCount: balances.length
     })).sort((a, b) => Math.abs(b.totalCash) - Math.abs(a.totalCash));
 
@@ -114,20 +116,20 @@ export class LedgerVisualizationComponent implements AfterViewInit, OnChanges {
     }));
 
     this.barChartConfig = {
+      width: 600,
       height: 400,
-      margin: { top: 20, right: 30, bottom: 60, left: 80 },
+      margin: { top: 20, right: 20, bottom: 80, left: 70 },
       showZeroLine: true,
       showValueLabels: true,
-      valueLabelFormatter: (v) => `$${(v / 1000).toFixed(0)}k`,
-      yAxisFormatter: (d) => `$${(d / 1000).toFixed(0)}k`,
+      valueLabelFormatter: (v: number) => `$${(v / 1000).toFixed(0)}k`,
+      yAxisFormatter: (d: number) => `$${(d / 1000).toFixed(0)}k`,
       xAxisLabel: 'Currency',
       yAxisLabel: 'Cash Balance ($)',
-      padding: 0.2
+      padding: 0.1
     };
     
-    console.log('LedgerVisualizationComponent: Updated barChartData:', {
-      barChartDataLength: this.barChartData.length,
-      barChartData: this.barChartData
+    console.log('[LedgerVisualization] barChartData updated:', {
+      barChartDataLength: this.barChartData.length
     });
   }
 
@@ -139,8 +141,8 @@ export class LedgerVisualizationComponent implements AfterViewInit, OnChanges {
 
     const txTypeCount = d3.rollup(
       this.transactions,
-      v => v.length,
-      d => d.transactionType
+      (v: Transaction[]) => v.length,
+      (d: Transaction) => d.transactionType
     );
 
     this.txData = Array.from(txTypeCount, ([type, count]) => ({

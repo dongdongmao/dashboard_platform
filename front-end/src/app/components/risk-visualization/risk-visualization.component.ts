@@ -1,5 +1,5 @@
-import { Component, Input, PLATFORM_ID, inject, AfterViewInit, OnChanges, SimpleChanges, Renderer2, ChangeDetectorRef } from '@angular/core';
-import { isPlatformBrowser, CommonModule } from '@angular/common';
+import { Component, Input, PLATFORM_ID, inject, OnInit, OnChanges, SimpleChanges, ChangeDetectorRef } from '@angular/core';
+import { isPlatformBrowser, isPlatformServer, CommonModule } from '@angular/common';
 import * as d3 from 'd3';
 import { RiskAccount, RiskMetric } from '../../services/dashboard.service';
 import { BarChartComponent, BarChartData, BarChartConfig } from '../shared/bar-chart/bar-chart.component';
@@ -59,7 +59,7 @@ import { BarChartComponent, BarChartData, BarChartConfig } from '../shared/bar-c
     }
   `]
 })
-export class RiskVisualizationComponent implements AfterViewInit, OnChanges {
+export class RiskVisualizationComponent implements OnInit, OnChanges {
   @Input() riskAccounts: RiskAccount[] = [];
   @Input() riskMetrics: RiskMetric[] = [];
 
@@ -67,25 +67,30 @@ export class RiskVisualizationComponent implements AfterViewInit, OnChanges {
   chartConfig: BarChartConfig = {};
 
   private readonly platformId = inject(PLATFORM_ID);
-  private readonly renderer = inject(Renderer2);
   private readonly cdr = inject(ChangeDetectorRef);
   private isBrowser = isPlatformBrowser(this.platformId);
+  private isServer = isPlatformServer(this.platformId);
 
-  ngAfterViewInit(): void {
-    if (this.isBrowser) {
-      this.updateChart();
-    }
+  ngOnInit(): void {
+    console.log('[RiskVisualization] ngOnInit:', {
+      isServer: this.isServer,
+      riskAccountsLength: this.riskAccounts?.length
+    });
+    // Process data immediately for both SSR and browser
+    this.updateChart();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (this.isBrowser) {
-      if (changes['riskAccounts'] || changes['riskMetrics']) {
-        setTimeout(() => {
-          this.updateChart();
-          // Force change detection to ensure BarChartComponent receives the update
-          this.cdr.detectChanges();
-        }, 0);
-      }
+    console.log('[RiskVisualization] ngOnChanges:', {
+      isServer: this.isServer,
+      riskAccountsChanged: !!changes['riskAccounts'],
+      riskAccountsLength: this.riskAccounts?.length
+    });
+    // Process data for both SSR and browser - same logic
+    if (changes['riskAccounts'] || changes['riskMetrics']) {
+      this.updateChart();
+      // Trigger change detection to ensure child component updates
+      this.cdr.detectChanges();
     }
   }
 
@@ -94,15 +99,13 @@ export class RiskVisualizationComponent implements AfterViewInit, OnChanges {
   }
 
   private updateChart(): void {
-    console.log('RiskVisualizationComponent updateChart:', {
-      riskAccountsLength: this.riskAccounts?.length,
-      riskAccounts: this.riskAccounts
+    console.log('[RiskVisualization] updateChart:', {
+      riskAccountsLength: this.riskAccounts?.length
     });
     
     if (!this.riskAccounts || !this.riskAccounts.length) {
       this.chartData = [];
       this.chartConfig = {};
-      console.log('RiskVisualizationComponent: No risk accounts, clearing chart data');
       return;
     }
 
@@ -114,19 +117,19 @@ export class RiskVisualizationComponent implements AfterViewInit, OnChanges {
     }));
 
     this.chartConfig = {
+      width: 600,
       height: 400,
-      margin: { top: 20, right: 30, bottom: 80, left: 80 }, // Increased bottom margin for rotated labels
+      margin: { top: 20, right: 20, bottom: 80, left: 70 },
       showZeroLine: false,
       showValueLabels: false,
-      yAxisFormatter: (d) => `$${(d / 1000).toFixed(0)}k`,
+      yAxisFormatter: (d: number) => `$${(d / 1000).toFixed(0)}k`,
       xAxisLabel: 'Account ID',
       yAxisLabel: 'Exposure ($)',
-      padding: 0.2
+      padding: 0.1
     };
     
-    console.log('RiskVisualizationComponent: Updated chartData:', {
-      chartDataLength: this.chartData.length,
-      chartData: this.chartData
+    console.log('[RiskVisualization] chartData updated:', {
+      chartDataLength: this.chartData.length
     });
   }
 }
